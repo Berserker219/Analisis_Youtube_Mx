@@ -65,6 +65,25 @@ def limpieza_nulos(df):
     
     return data_copy
 
+# ELIMINACION DE COLUMNAS NO NECESARIAS
+
+def eliminar_columnas_innecesarias(df, columnas_a_conservar):
+    return df[columnas_a_conservar].copy()
+
+
+columnas_utiles = ["video_id",
+                   'category_id', 
+                   "title", 
+                   "description", 
+                   "tags", 
+                   "publish_time", 
+                   "hour", 
+                   "franja_horaria", 
+                   "views", 
+                   "likes", 
+                   "dislikes", 
+                   "comment_count"]
+
 
 
 # FUNCIONES
@@ -73,6 +92,7 @@ data_copy = limpieza_duplicados(data_copy)
 data_copy = preprocesar_publish_time(data_copy)
 data_copy = crear_franja_horaria(data_copy)
 data_copy = limpieza_nulos(data_copy)
+data_copy = eliminar_columnas_innecesarias(data_copy, columnas_utiles)
 
 data_copy.to_csv("data/processed/MXvideos_clean.csv", index=False, encoding="utf-8")
 print("Dataset limpio guardado en data/processed/MXvideos_clean.csv")
