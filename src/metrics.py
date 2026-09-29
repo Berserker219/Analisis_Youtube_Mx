@@ -122,5 +122,11 @@ def promedio_ttr_horario(df,ta,tr,rc):
     return promedio_ttr_horario
 
 
+# Crear columnas de métricas en el DataFrame
+df['tasa_actividad'] = tasa_actividad(df)
+df['tasa_rechazo'] = tasa_rechazo(df)
+df['ratio_comentarios'] = ratio_comentarios(df)
 
-
+# Guardar dataset con métricas incluidas
+df.to_csv("data/processed/MXvideos_metrics.csv", index=False, encoding="utf-8")
+print("Dataset con métricas guardado en data/processed/MXvideos_metrics.csv")
