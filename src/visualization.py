@@ -1,188 +1,86 @@
-import matplotlib.pyplot as plt
-import seaborn as sns
+# GRAFICAS DEL ANALISIS
+# Entrada : data/processed/MXvideos_metrics.csv
+# Salida  : graficas/*.png
+
 import os
 
-# Crear carpeta graficas si no existe
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+AZUL = "#1F4E79"
 os.makedirs("graficas", exist_ok=True)
 
-# 1. Gráficas de barras de métricas por categoría
-def plot_metricas_por_categoria(df):
-    fig, axes = plt.subplots(1, 3, figsize=(18,6))
 
-    sns.barplot(x='category_id', y='tasa_actividad', data=df, ax=axes[0])
-    axes[0].set_title('Tasa de actividad promedio por categoría')
-
-    sns.barplot(x='category_id', y='tasa_rechazo', data=df, ax=axes[1])
-    axes[1].set_title('Tasa de rechazo promedio por categoría')
-
-    sns.barplot(x='category_id', y='ratio_comentarios', data=df, ax=axes[2])
-    axes[2].set_title('Ratio de comentarios promedio por categoría')
-
-    plt.tight_layout()
-    plt.savefig("graficas/gb_metrica_categoria.png")
-    
-
-# 2. Horarios óptimos de publicación
-def plot_horarios_optimos(df):
-    horarios_optimos = df.groupby('hour')[['tasa_actividad']].mean().reset_index()
-    plt.figure(figsize=(10,6))
-    plt.bar(horarios_optimos['hour'], horarios_optimos['tasa_actividad'])
-    plt.title('Promedio de Tasa de Actividad por Hora')
-    plt.xlabel('Hora')
-    plt.ylabel('Promedio de Tasa de Actividad')
-    plt.xticks(range(0,24))
-    plt.savefig("graficas/gb_horario_optimo.png")
-    
-
-# 3. Promedio de tasa de actividad por categoría
-def plot_tasa_actividad_categoria(df):
-    plt.figure(figsize=(10,6))
-    sns.barplot(x='category_id', y='tasa_actividad', data=df)
-    plt.title("Promedio de Tasa de Actividad por Categoría")
-    plt.ylabel("Promedio de Tasa de Actividad")
-    plt.xlabel("Categoría")
-    plt.savefig("graficas/gb_tasa_activdidad_categoria.png")
-    
-
-# 4. Variación de tags entre dos años
-def plot_variacion_tags(tags_variacion):
-    tags_variacion['variacion'] = tags_variacion[2018] - tags_variacion[2017]
-    tags_emergentes = tags_variacion.sort_values(by='variacion', ascending=False).head(10)
-    tags_declive = tags_variacion.sort_values(by='variacion', ascending=True).head(10)
-
-    fig, axes = plt.subplots(1, 2, figsize=(16,6))
-
-    sns.barplot(x=tags_emergentes['variacion'], y=tags_emergentes.index, ax=axes[0], palette="Greens_r")
-    axes[0].set_title("Tags emergentes (variación positiva)")
-
-    sns.barplot(x=tags_declive['variacion'], y=tags_declive.index, ax=axes[1], palette="Reds")
-    axes[1].set_title("Tags en declive (variación negativa)")
-
-    plt.tight_layout()
-    plt.savefig("graficas/variacion_tags.png")
-    
-
-# 5. Histogramas
+# 1. Distribucion de vistas (escala logaritmica, porque la distribucion es muy asimetrica)
 def plot_histogramas(df):
-    df['views'].plot.hist(title="Histograma de Views")
-    plt.savefig("graficas/h_views.png")
-    
+    plt.figure(figsize=(8, 5))
+    plt.hist(np.log10(df["views"]), bins=40, color=AZUL)
+    plt.axvline(np.log10(df["views"].median()), color="#C55A11", ls="--", label="Mediana")
+    plt.title("Distribución de vistas")
+    plt.xlabel("Vistas (escala log10)")
+    plt.ylabel("Videos")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("graficas/h_views.png", dpi=150)
+    plt.close()
 
-    df['likes'].plot.hist(title="Histograma de Likes")
-    plt.savefig("graficas/h_likes.png")
-    
 
-    df['comment_count'].plot.hist(title="Histograma de Comment Count")
-    plt.savefig("graficas/h_comment_count.png")
-    
+# 2. Tasa de actividad mediana por categoria
+def plot_tasa_actividad_categoria(df, min_videos=10):
+    # Se excluyen categorias con muy pocos videos (p. ej. "Shows" tiene 3)
+    conteo = df["categoria"].value_counts()
+    df = df[df["categoria"].isin(conteo[conteo >= min_videos].index)]
+    plt.figure(figsize=(10, 7))
+    orden = df.groupby("categoria")["tasa_actividad"].median().sort_values(ascending=False).index
+    sns.barplot(y="categoria", x="tasa_actividad", data=df, order=orden,
+                estimator="median", errorbar=None, color=AZUL)
+    plt.axvline(2, color="gray", ls=":")
+    plt.axvline(5, color="gray", ls=":")
+    plt.title("Tasa de Actividad Mediana por Categoría")
+    plt.xlabel("Mediana de Tasa de Actividad (%)")
+    plt.ylabel("")
+    plt.tight_layout()
+    plt.savefig("graficas/gb_tasa_actividad_categoria.png", dpi=150)
+    plt.close()
 
-# 6. Boxplots
-def plot_boxplots(df):
-    sns.boxplot(x=df['views'])
-    plt.title('Boxplot de Views')
-    plt.savefig("graficas/box_vistas.png")
-    
 
-    sns.boxplot(x=df['likes'])
-    plt.title('Boxplot de Likes')
-    plt.savefig("graficas/box_likes.png")
-    
+# 3. Horarios optimos de publicacion (hora local de la Ciudad de Mexico)
+def plot_horarios_optimos(df):
+    por_hora = df.groupby("hour")["tasa_actividad"].median().reset_index()
+    plt.figure(figsize=(10, 6))
+    plt.bar(por_hora["hour"], por_hora["tasa_actividad"], color=AZUL)
+    plt.axhline(2, color="gray", ls=":")
+    plt.axhline(5, color="gray", ls=":")
+    plt.title("Mediana de Tasa de Actividad por Hora de Publicación (hora de la Ciudad de México)")
+    plt.xlabel("Hora")
+    plt.ylabel("Mediana de Tasa de Actividad (%)")
+    plt.xticks(range(0, 24))
+    plt.tight_layout()
+    plt.savefig("graficas/gb_horario_optimo.png", dpi=150)
+    plt.close()
 
-    sns.boxplot(x=df['comment_count'])
-    plt.title('Boxplot de Comment Count')
-    plt.savefig("graficas/box_comentarios.png")
-    
 
-# 7. Scatterplot con boxplots marginales
-def plot_scatter_views_likes(df):
-    g = sns.jointplot(
-        data=df,
-        x="views",
-        y="likes",
-        kind="scatter",
-        marginal_kws=dict(bins=50, fill=True)
-    )
-    plt.suptitle("Boxplot bivariado: Views vs Likes", y=1.02)
-    g.savefig("graficas/box_vistas_vs_likes.png")
-    
-
-# 8. Heatmap de correlación entre métricas
+# 4. Correlacion entre vistas, likes, dislikes y comentarios
+#    Spearman es mas confiable aqui porque los valores extremos distorsionan Pearson.
 def plot_heatmap_metricas(df):
-    corr = df[['views','likes','dislikes','comment_count']].corr()
-    plt.figure(figsize=(8,6))
-    sns.heatmap(corr, annot=True, cmap='coolwarm', fmt='.2f')
-    plt.title('Matriz de correlación entre métricas')
-    plt.savefig("graficas/hc_metricas.png")
-    
-
-# 9. Heatmap de correlación entre horario y tasa de actividad
-def plot_heatmap_horario_tasa(df):
-    corr = df[['hour','tasa_actividad']].corr()
-    plt.figure(figsize=(8,6))
-    sns.heatmap(corr, annot=True, cmap='coolwarm', fmt='.2f')
-    plt.title('Matriz de correlación entre horario y tasa de actividad')
-    plt.savefig("graficas/hc_horario_tasa.png")
-    
-
-# 10. Evolución de views por fecha
-def plot_views_por_fecha(df):
-    # Convertir publish_time a datetime si no lo es
-    df['publish_time'] = pd.to_datetime(df['publish_time'], errors='coerce')
-    # Extraer solo la fecha
-    df['fecha'] = df['publish_time'].dt.date
-    views_por_fecha = df.groupby('fecha')['views'].mean().reset_index()
-
-    plt.figure(figsize=(12,6))
-    sns.lineplot(x='fecha', y='views', data=views_por_fecha, marker='o')
-    plt.title('Promedio de Views por Fecha')
-    plt.xlabel('Fecha de publicación')
-    plt.ylabel('Promedio de Views')
-    plt.xticks(rotation=45)
-    plt.savefig("graficas/evolucion_vistas_fecha.png")
-    plt.show()
-
-
-# 11. Evolución de views por categoría
-def plot_views_por_categoria(df):
-    # Convertir publish_time a datetime si no lo es
-    df['publish_time'] = pd.to_datetime(df['publish_time'], errors='coerce')
-    # Extraer solo la fecha
-    df['fecha'] = df['publish_time'].dt.date
-    views_categoria = (
-        df.groupby(['fecha','category_id'])['views']
-        .mean()
-        .reset_index()
-    )
-
-    plt.figure(figsize=(12,6))
-    sns.lineplot(
-        data=views_categoria,
-        x='fecha',
-        y='views',
-        hue='category_id',
-        marker='o'
-    )
-    plt.title("Evolución de vistas por categoría")
-    plt.xlabel("Fecha de publicación")
-    plt.ylabel("Promedio de vistas")
-    plt.xticks(rotation=45)
-    plt.legend(title="Categoría")
-    plt.savefig("graficas/evolucion_vistas_categoria.png")
-    plt.show()
-
+    columnas = ["views", "likes", "dislikes", "comment_count"]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    for ax, metodo in zip(axes, ["pearson", "spearman"]):
+        sns.heatmap(df[columnas].corr(metodo), annot=True, cmap="Blues", fmt=".2f",
+                    vmin=0.3, vmax=1, cbar=False, ax=ax)
+        ax.set_title(f"Correlación de {metodo.capitalize()}")
+    plt.tight_layout()
+    plt.savefig("graficas/hc_metricas.png", dpi=150)
+    plt.close()
 
 
 if __name__ == "__main__":
-    import pandas as pd
     df = pd.read_csv("data/processed/MXvideos_metrics.csv", encoding="utf-8")
 
-    plot_metricas_por_categoria(df)
-    plot_horarios_optimos(df)
-    plot_tasa_actividad_categoria(df)
     plot_histogramas(df)
-    plot_boxplots(df)
-    plot_scatter_views_likes(df)
+    plot_tasa_actividad_categoria(df)
+    plot_horarios_optimos(df)
     plot_heatmap_metricas(df)
-    plot_heatmap_horario_tasa(df)
-    plot_views_por_fecha(df)
-    plot_views_por_categoria(df)
+    print("Gráficas guardadas en graficas/")

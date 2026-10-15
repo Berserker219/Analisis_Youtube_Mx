@@ -1,132 +1,123 @@
-import pandas as pd 
+# METRICAS DE ENGAGEMENT
+# Entrada : data/processed/MXvideos_clean.csv
+# Salidas : data/processed/MXvideos_metrics.csv
+#           data/processed/resumen_categoria.csv
+#           data/processed/resumen_franja_horaria.csv
+#           data/processed/resumen_hora.csv
+
 import numpy as np
+import pandas as pd
 
-df = pd.read_csv("data/processed/MXvideos_clean.csv", encoding="latin-1")
-
-
-# conteo de la hora de publicacion
-
-def conteo_horario_publicacion(df):
-    hora_publicacion = df['publish_time'].dt.hour.value_counts()
-    return hora_publicacion
-
-# Agrupar por categorias y calcular metricas descriptivas
-def tendencia_categoria(df):
-
-    tendencias_categoria =(
-        df.groupby('category_id')[['views','likes','dislikes','comment_count']]
-        .agg(['mean','median','max','min'])
-        .reset_index()
-    )
-
-    return tendencias_categoria
+METRICAS = ["tasa_actividad", "tasa_rechazo", "ratio_comentarios"]
 
 
 """
 Tasa de engagement (tasa de actividad)
-La formula para calcular la tasa de engagement en Youtube, se suele medir el nivel de interaccion de los usuarios con respecto al numero de visualizaciones, por que los suscriptores no siempre ven los videos
+Mide la interaccion de los usuarios con respecto al numero de visualizaciones,
+porque los suscriptores no siempre ven los videos.
 
 INTERPRETACION
 
 Menos de 2%: Bajo nivel de interaccion
 Entre 2-5%: Aceptable.
-Mas de 5%: Excelente, indica que tu contenido genera conversación y reacción
+Mas de 5%: Excelente, indica que tu contenido genera conversacion y reaccion
 """
-
-# Metrica para calcular Tasa de engagement
 
 def tasa_actividad(df):
-    tasa_actividad = ((df['likes'] + df['comment_count']) / df['views'].replace(0,np.nan)) * 100
-    return tasa_actividad
+    return ((df["likes"] + df["comment_count"]) / df["views"].replace(0, np.nan)) * 100
 
 
 """
-Tasa de Rechazo
-La tasa de rechazo = dislikes / views:
+Tasa de Rechazo = dislikes / views
 
-Dislikes: Señalan desaprobación o insatisfacción con el contenido.
-Views : Base de referencia, por que cada vista es una oportunidad de reaccion.
+Dislikes: señalan desaprobacion o insatisfaccion con el contenido.
+Views: base de referencia, cada vista es una oportunidad de reaccion.
+
 INTERPRETACION
 
-0 - 1%: Muy bajo rechazo -> tu contenido cumple expectativas, cada nadie lo desaprueba.
-1- 3%: Rechazo moderado -> puede ser normal en temas polemicos o de nicho.
+0 - 1%: Muy bajo rechazo -> el contenido cumple expectativas.
+1 - 3%: Rechazo moderado -> puede ser normal en temas polemicos o de nicho.
 3 - 5%: Rechazo alto -> conviene revisar titulo, miniatura o calidad de contenido.
-Más de 5%: Rechazo critico -> indica que el video genera frsutaciión, decepción o que el público siente que fue engañado
+Mas de 5%: Rechazo critico -> el video genera frustracion o decepcion.
 """
-
-# Metrica para calcular la tasa de rechazo
 
 def tasa_rechazo(df):
-    tasa_rechazo = (df['dislikes'] / df['views']) * 100
-    return tasa_rechazo
+    return (df["dislikes"] / df["views"].replace(0, np.nan)) * 100
 
 
 """
-Ratio de comentarios
-La metrica de Ratio de comentarios por 1000 vistas es muy util para medir la profuncidad del engagement en Youtube, por que los comentarios implican un esfuerzo mayor que un simple "like".
+Ratio de comentarios por 1000 vistas
+Mide la profundidad del engagement, porque comentar implica mas esfuerzo que un "like".
+Multiplicar por 1000 normaliza la metrica para comparar videos con distinto volumen de vistas.
 
-Comentarios: Reflejan conversación, debate o interés genuino.
-Views: Base de referencia, cada vista es una oportunidad de comentar.
-Multiplicar por 1000: normaliza la metrica para que sea mas facil comparar entre videos con distinto volumen vistas.
 INTERPRETACION
 
-0 - 2 comentarios/1000 vistas: bajo nivel de conversacion, la audiencia consume pero no participa.
-3-5 comentarios/1000 vistas: nivel aceptable, hay interacción moderada.
-6-10 comentarios/1000 vistas: buen engagement, tu contenido invita a opinar.
-Mas de 10 comentarios/1000 vistas: excelente, tu video genera debate o fuerte conexion.
+0 - 2 comentarios/1000 vistas: bajo nivel de conversacion.
+3 - 5 comentarios/1000 vistas: nivel aceptable.
+6 - 10 comentarios/1000 vistas: buen engagement.
+Mas de 10 comentarios/1000 vistas: excelente, el video genera debate.
 """
 
-# Metrica para calcular el ratio de comentarios
-
 def ratio_comentarios(df):
-    ratio_comentarios = (df['comment_count'] / df['views']) * 1000
-    return ratio_comentarios
+    return (df["comment_count"] / df["views"].replace(0, np.nan)) * 1000
 
 
-# Metrica Promedio de tasa_actividad, tasa_rechazo, ratio_comentarios por categoria
+# Conteo de videos publicados por hora (hora local)
+def conteo_horario_publicacion(df):
+    return df["hour"].value_counts().sort_index()
 
-def promedio_ttr_categoria(df,ta,tr,rc):
 
-    promedio_ttr_categoria = (
-        df.groupby('category_id')[[ta,tr,rc]]
-        .mean()
+# Resumen de las tres metricas por grupo. Usa la MEDIANA porque las
+# distribuciones tienen colas muy largas (la media esta distorsionada por videos virales).
+def resumen_metricas(df, por):
+    return (
+        df.groupby(por)
+        .agg(
+            videos=("video_id", "size"),
+            vistas_mediana=("views", "median"),
+            tasa_actividad=("tasa_actividad", "median"),
+            tasa_rechazo=("tasa_rechazo", "median"),
+            ratio_comentarios=("ratio_comentarios", "median"),
+        )
+        .round(2)
         .reset_index()
     )
 
-    return promedio_ttr_categoria
 
-
-# Metrica Promedio de tasa_actividad, tasa_rechazo, ratio_comentarios por franja_horaria
-
-def promedio_ttr_franja_horaria(df,ta,tr,rc):
-
-    promedio_ttr_franja_horaria = (
-        df.groupby('franaja_horaria')[[ta,tr,rc]]
-        .mean()
+# Descriptivos de likes, dislikes, comentarios y vistas por categoria
+def tendencia_categoria(df):
+    return (
+        df.groupby("categoria")[["views", "likes", "dislikes", "comment_count"]]
+        .agg(["mean", "median", "max", "min"])
         .reset_index()
     )
 
-    return promedio_ttr_franja_horaria
 
-
-# Metrica Promedio de tasa_actividad, tasa_rechazo, ratio_comentarios por horario
-
-def promedio_ttr_horario(df,ta,tr,rc):
-
-    promedio_ttr_horario = (
-        df.groupby('hour')[[ta,tr,rc]]
-        .mean()
-        .reset_index()
+if __name__ == "__main__":
+    # Lee en UTF-8 (asi se guardo) y vuelve a convertir publish_time a fecha
+    df = pd.read_csv(
+        "data/processed/MXvideos_clean.csv",
+        encoding="utf-8",
+        parse_dates=["publish_time"],
     )
 
-    return promedio_ttr_horario
+    df["tasa_actividad"] = tasa_actividad(df)
+    df["tasa_rechazo"] = tasa_rechazo(df)
+    df["ratio_comentarios"] = ratio_comentarios(df)
 
+    df.to_csv("data/processed/MXvideos_metrics.csv", index=False, encoding="utf-8")
+    print("Dataset con métricas guardado en data/processed/MXvideos_metrics.csv")
 
-# Crear columnas de métricas en el DataFrame
-df['tasa_actividad'] = tasa_actividad(df)
-df['tasa_rechazo'] = tasa_rechazo(df)
-df['ratio_comentarios'] = ratio_comentarios(df)
+    resumen_metricas(df, "categoria").sort_values("tasa_actividad", ascending=False).to_csv(
+        "data/processed/resumen_categoria.csv", index=False, encoding="utf-8"
+    )
+    resumen_metricas(df, "franja_horaria").to_csv(
+        "data/processed/resumen_franja_horaria.csv", index=False, encoding="utf-8"
+    )
+    resumen_metricas(df, "hour").to_csv(
+        "data/processed/resumen_hora.csv", index=False, encoding="utf-8"
+    )
+    print("Resúmenes por categoría, franja horaria y hora guardados en data/processed/")
 
-# Guardar dataset con métricas incluidas
-df.to_csv("data/processed/MXvideos_metrics.csv", index=False, encoding="utf-8")
-print("Dataset con métricas guardado en data/processed/MXvideos_metrics.csv")
+    print("\nVideos publicados por hora:")
+    print(conteo_horario_publicacion(df).to_string())
